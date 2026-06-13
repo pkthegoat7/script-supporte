@@ -80,8 +80,28 @@
 <script>
 const $ = (id) => document.getElementById(id);
 
-$("show-token").addEventListener("change", e => {
-  $("token").type = e.target.checked ? "text" : "password";
+let _tokenRevealed = false;
+$("show-token").addEventListener("change", async e => {
+  const tokenInput = $("token");
+  if (e.target.checked) {
+    if (!_tokenRevealed) {
+      try {
+        const r = await fetch("/api/token");
+        if (r.ok) {
+          const data = await r.json();
+          if (data.token) {
+            tokenInput.value = data.token;
+            _tokenRevealed = true;
+          }
+        }
+      } catch (err) {
+        logLine("err", "nao consegui buscar token: " + err);
+      }
+    }
+    tokenInput.type = "text";
+  } else {
+    tokenInput.type = "password";
+  }
 });
 
 function setStatus(label, color) {

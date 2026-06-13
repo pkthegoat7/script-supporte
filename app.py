@@ -199,6 +199,14 @@ async def api_status(request: Request):
     }
 
 
+@app.get("/api/token")
+async def api_token(request: Request):
+    if not request.session.get("auth"):
+        raise HTTPException(401)
+    cfg = load_config()
+    return {"token": cfg.get("token", "")}
+
+
 # ============================ WebSocket =========================
 @app.websocket("/ws")
 async def ws(websocket: WebSocket):
