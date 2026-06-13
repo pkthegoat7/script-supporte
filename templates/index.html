@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auto Assumir Ticket</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Auto Assumir Ticket</h1>
+      <p class="muted">Monitora threads do HIT-Suporte e assume 1 por vez</p>
+    </div>
+    <div class="status-wrap">
+      <span id="status-dot" class="dot dot-{{ status_color }}"></span>
+      <span id="status-label">{{ status_label }}</span>
+      <a class="muted small" href="/logout" style="margin-left:18px">sair</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Configuração</h2>
+
+      <div class="row">
+        <div class="field full">
+          <div class="label-row">
+            <label for="token">Token do usuário</label>
+            <label class="switch">
+              <input type="checkbox" id="show-token">
+              <span>mostrar</span>
+            </label>
+          </div>
+          <input type="password" id="token" value="{{ config.token }}" placeholder="Cole o token aqui">
+          <small class="muted">Não compartilhe. Salvo em volume persistente da Railway.</small>
+        </div>
+      </div>
+
+      <div class="row two">
+        <div class="field">
+          <label for="parent">ID do canal pai (#supporter)</label>
+          <input type="text" id="parent" value="{{ config.parent_channel_id or '' }}" inputmode="numeric">
+          <small class="muted">Clique direito no canal → Copiar ID</small>
+        </div>
+        <div class="field">
+          <label for="botid">ID do bot HIT</label>
+          <input type="text" id="botid" value="{{ config.bot_id or '' }}" inputmode="numeric">
+          <small class="muted">Clique direito no avatar → Copiar ID</small>
+        </div>
+      </div>
+
+      <div class="row two">
+        <div class="field">
+          <label for="label">Label do botão</label>
+          <input type="text" id="label" value="{{ config.button_label }}">
+          <small class="muted">Texto exato do botão a clicar</small>
+        </div>
+        <div class="field">
+          <label for="wait">Timeout da embed (s)</label>
+          <input type="number" id="wait" value="{{ config.embed_wait_seconds }}" min="5" max="120">
+          <small class="muted">Quanto esperar a embed aparecer</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="actions">
+      <button id="btn-start" class="btn primary">▶ Iniciar</button>
+      <button id="btn-stop" class="btn danger" disabled>■ Parar</button>
+      <button id="btn-save" class="btn ghost">💾 Salvar config</button>
+      <button id="btn-clear" class="btn link" style="margin-left:auto">limpar log</button>
+    </section>
+
+    <section class="card log-card">
+      <h2>Log de atividade</h2>
+      <div id="log" class="log"></div>
+    </section>
+  </main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+$("show-token").addEventListener("change", e => {
+  $("token").type = e.target.checked ? "text" : "password";
+});
+
+function setStatus(label, color) {
+  $("status-label").textContent = label;
+  const dot = $("status-dot");
+  dot.className = "dot dot-" + color;
+  const running = !["parado", "erro"].includes(label.split(" ")[0]);
+  $("btn-start").disabled = running;
+  $("btn-stop").disabled = !running;
+}
+
+function logLine(level, msg) {
+  const div = document.createElement("div");
+  div.className = "log-line lvl-" + level;
+  div.textContent = msg;
+  const log = $("log");
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function connectWS() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === "log") logLine(m.level, m.msg);
+    if (m.type === "status") setStatus(m.label, m.color);
+  };
+  ws.onclose = () => setTimeout(connectWS, 2000);
+}
+connectWS();
+
+async function postJSON(url, body) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body || {}),
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    logLine("err", `${url}: ${t}`);
+    throw new Error(t);
+  }
+  return r.json();
+}
+
+$("btn-save").onclick = () => postJSON("/api/config", {
+  token: $("token").value,
+  parent_channel_id: $("parent").value,
+  bot_id: $("botid").value,
+  button_label: $("label").value,
+  embed_wait_seconds: $("wait").value,
+}).catch(()=>{});
+
+$("btn-start").onclick = async () => {
+  await postJSON("/api/config", {
+    token: $("token").value,
+    parent_channel_id: $("parent").value,
+    bot_id: $("botid").value,
+    button_label: $("label").value,
+    embed_wait_seconds: $("wait").value,
+  }).catch(()=>{});
+  postJSON("/api/start").catch(()=>{});
+};
+
+$("btn-stop").onclick = () => postJSON("/api/stop").catch(()=>{});
+$("btn-clear").onclick = () => { $("log").innerHTML = ""; };
+
+// Initial UI state
+setStatus("{{ status_label }}", "{{ status_color }}");
+</script>
+</body>
+</html>

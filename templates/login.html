@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login — Auto Ticket</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="center">
+  <form class="card login" method="post" action="/login">
+    <div class="dot dot-accent"></div>
+    <h1>Auto Assumir Ticket</h1>
+    <p class="muted">Entre com a senha do painel.</p>
+    <label>Senha</label>
+    <input type="password" name="password" autofocus required>
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <button class="btn primary" type="submit">Entrar</button>
+  </form>
+</body>
+</html>
